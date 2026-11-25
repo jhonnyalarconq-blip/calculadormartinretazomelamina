@@ -176,6 +176,7 @@ body{background:var(--bg);min-height:100vh;padding:max(12px,env(safe-area-inset-
 .fo.mas .pv{background:#fff;border:2px dashed var(--c4);font-size:38px;font-weight:900;color:var(--c2)}
 .otro{background:var(--fill);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.rowp{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:12px;align-items:end}
 .done{width:100%;margin-top:14px;padding:12px;font-size:15px;font-weight:800;border:none;border-radius:10px;background:var(--c2);color:#fff;cursor:pointer}
 .done:hover{background:#3a1226}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}.tv span.pop{animation:none}}
@@ -204,8 +205,8 @@ body{background:var(--bg);min-height:100vh;padding:max(12px,env(safe-area-inset-
       <div class="sec"><span class="n">2</span>Melamina entera<small>formato de plancha entera</small></div>
       <div class="fg"><span class="lb">Formato de la plancha</span>
         <button type="button" class="fbtn" id="fbtn" onclick="openF()"><div><b id="f-t">2.14 × 2.44 m</b></div><span class="go">Cambiar ›</span></button></div>
-      <div class="fg"><label class="lb" for="pm">Precio de la melamina (plancha entera)</label><div class="inp"><span class="pre">S/</span><input type="number" id="pm" step="any" min="0" placeholder="0.00" inputmode="decimal" onfocus="this.select()" oninput="calc()"></div></div>
-      <div class="info">Plancha: <b><span id="r-pl">0</span> m²</b><i>·</i>Costo: <b>S/ <span id="r-cm">0.00</span> por m²</b></div>
+      <div class="rowp"><div class="fg"><label class="lb" for="pm">Precio de la melamina (plancha entera)</label><div class="inp"><span class="pre">S/</span><input type="number" id="pm" step="any" min="0" placeholder="0.00" inputmode="decimal" onfocus="this.select()" oninput="calc()"></div></div><div class="fg"><label class="lb" for="dc">% de descuento</label><div class="inp"><input type="number" id="dc" step="any" min="0" max="100" placeholder="0" inputmode="decimal" onfocus="this.select()" oninput="calc()"><span class="u">%</span></div></div></div>
+      <div class="info">Plancha: <b><span id="r-pl">0</span> m²</b><i>·</i>Costo: <b>S/ <span id="r-cm">0.00</span> por m²</b><span id="r-dc" class="hidden"><i>·</i>Precio con descuento: <b>S/ <span id="r-pd">0.00</span></b></span></div>
     </section>
   </div>
 
@@ -293,6 +294,7 @@ function explain(own,v){
   const st=[];
   st.push(['Área del retazo',(own?fa(v.l1)+' m × '+fa(v.l2)+' m':'0.40 m × 0.50 m')+' = <b>'+fa(v.ar)+' m²</b>'+(unit!=='m'&&own?' (las medidas se pasan a metros)':'')]);
   st.push(['Área de la plancha entera',v.pltxt+' = <b>'+fa(v.pl)+' m²</b> (es el rendimiento de ese formato)']);
+  if(v.dc>0)st.push(['Precio con descuento','S/ '+f2(v.pm0)+' − '+v.dc+'% = <b>S/ '+f2(v.pm)+'</b> (con este precio se calcula todo lo demás)']);
   st.push(['Precio a vender',fa(v.ar)+' m² × S/ '+f2(v.pm)+' ÷ '+fa(v.pl)+' m² = S/ '+f2(v.pr)+' → <b>S/ '+f2(v.pr)+'</b>']);
   st.push(['Cantidad en el Oracle','S/ '+f2(v.pr)+' ÷ '+ORACLE+' = '+f6(v.cant)+' → se colocan los <b>5 primeros dígitos: '+trunc5(v.cant)+'</b> (se cortan, no se redondean)']);
   $('lrn-b').innerHTML='<div class="lh">'+(own?'Con tus medidas':'Ejemplo: retazo de 40 × 50 cm, plancha de 2.14 × 2.44 m a S/ 120 (escribe tus datos para verlo con tus medidas)')+'</div><ol class="steps">'+st.map((x,i)=>'<li><span class="n">'+(i+1)+'</span><div><span class="st">'+x[0]+'</span>'+x[1]+'</div></li>').join('')+'</ol>';
@@ -300,12 +302,13 @@ function explain(own,v){
 
 /* ---------- Cálculo ---------- */
 function calc(){
-  const l1=mts('rl'),l2=mts('ra'),pm=num('pm'),P=plancha();
+  const l1=mts('rl'),l2=mts('ra'),pm0=num('pm'),dc=Math.min(100,Math.max(0,num('dc')||0)),pm=Math.round(pm0*(1-dc/100)*100)/100,P=plancha();
   const ar=r6(l1*l2),pl=P.area,own=ar>0&&pm>0&&pl>0;
   $('f-t').textContent=P.txt;
   $('r-ar').textContent=ar>0?fa(ar):'0';
   $('r-pl').textContent=pl>0?fa(pl):'0';
   $('r-cm').textContent=pl>0&&pm>0?f2(pm/pl):'0.00';
+  $('r-pd').textContent=f2(pm);$('r-dc').classList.toggle('hidden',!(dc>0&&pm0>0));
   const pr=own?Math.round(ar*pm/pl*100)/100:0;           /* precio a vender, en céntimos */
   const cant=own?pr/ORACLE:0,tc=own?trunc5(cant):'';
   const e=$('m-v');e.textContent=f2(pr);e.classList.remove('pop');void e.offsetWidth;e.classList.add('pop');
@@ -315,14 +318,14 @@ function calc(){
   const w=$('warn');
   if(own&&ar>pl){w.textContent='⚠ El retazo es más grande que la plancha entera. Revisa las medidas o el formato.';w.classList.remove('hidden')}
   else w.classList.add('hidden');
-  if(own)explain(true,{l1,l2,ar,pl,pm,pr,cant,pltxt:P.txt});
-  else{const ar0=r6(.4*.5),pl0=r6(2.14*2.44),pr0=Math.round(ar0*120/pl0*100)/100;explain(false,{ar:ar0,pl:pl0,pm:120,pr:pr0,cant:pr0/ORACLE,pltxt:'2.14 m × 2.44 m'})}
+  if(own)explain(true,{l1,l2,ar,pl,pm,pm0,dc,pr,cant,pltxt:P.txt});
+  else{const ar0=r6(.4*.5),pl0=r6(2.14*2.44),pr0=Math.round(ar0*120/pl0*100)/100;explain(false,{dc:0,ar:ar0,pl:pl0,pm:120,pr:pr0,cant:pr0/ORACLE,pltxt:'2.14 m × 2.44 m'})}
 }
 calc();
 /* ---------- Nuevo cálculo: deja todo como recién abierto ---------- */
 function nuevoCalculo(){
   closeF();
-  ['rl','ra','pm'].forEach(id=>{$(id).value=''});
+  ['rl','ra','pm','dc'].forEach(id=>{$(id).value=''});
   fsel=0;OT=['',''];
   unit='m';['m','cm','mm'].forEach(k=>$('u-'+k).classList.toggle('on',k==='m'));
   document.querySelectorAll('[data-u]').forEach(e=>e.textContent='m');
